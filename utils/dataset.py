@@ -2,7 +2,7 @@ import os
 import shutil
 import random
 SOURCE=r"D:\kaggle\tuberculosis-tb-chest-xray-dataset\TB_Chest_Radiography_Database"
-DESTINATION=r"D:\github\utils"
+DESTINATION=r"D:\DestinationFolder"
 classes=['Normal',"Tuberculosis"]
 split_ratio=0.8
 os.makedirs(f"{DESTINATION}/train",exist_ok=True)
@@ -21,4 +21,3 @@ for img in train_images:
 for img in val_images:
         shutil.copy(os.path.join(src_folder, img), f"{DESTINATION}/val/{x}")
 
-#D:\kaggle\tuberculosis-tb-chest-xray-dataset\TB_Chest_Radiography_Database\Normal
