@@ -1,6 +1,6 @@
-import os
-import shutil
-import random
+import os #library research done
+import shutil # high level file manipulation, used to copy in the below code
+import random #used the implement the .shuffle() functionality on the images for trainign
 SOURCE=r"D:\kaggle\tuberculosis-tb-chest-xray-dataset\TB_Chest_Radiography_Database"
 DESTINATION=r"D:\DestinationFolder"
 classes=['Normal',"Tuberculosis"]
@@ -16,8 +16,7 @@ for x in classes:
     split_index=int(len(images)*split_ratio)
     train_images=images[:split_index]
     val_images=images[split_index:]
-for img in train_images:
-        shutil.copy(os.path.join(src_folder, img), f"{DESTINATION}/train/{x}")
-for img in val_images:
-        shutil.copy(os.path.join(src_folder, img), f"{DESTINATION}/val/{x}")
-
+    for img in train_images:
+         shutil.copy(os.path.join(src_folder, img), f"{DESTINATION}/train/{x}")
+    for img in val_images:
+         shutil.copy(os.path.join(src_folder, img), f"{DESTINATION}/val/{x}")
