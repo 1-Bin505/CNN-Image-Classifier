@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>    
+
+<head>
+    <title>TB Detection</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+</head>
+
+<body>
+    <h1>TB Detection using CNN</h1>
+    <div class="container">
+        <div class="left">
+            <h3>Image for TB Detection</h3>
+            <img src="../images/placeholder.png">
+            <button onclick="uploadButton()">Upload Image</button>
+            <button onclick="predictButton()">Predict</button>
+        </div>
+        <div class="mid">
+            <div class="top-mid">
+                <h3>Prediction Result</h3>
+                <p id="prediction">Prediction: </p>
+                <p id="accuracy">Accuracy: </p>
+                <p id="precision">Precision: </p>
+                <p id="recall">Recall: </p>
+                <p id="f1score">F1-Score: </p>
+            </div>
+            <div class="bottom-mid">
+                <h3>Graphs</h3>
+                <div class="graph active">
+                    <img src="../images/graph_placeholder.jpg">
+                    <p>Graph 1</p>
+                </div>
+                <div class="graph">
+                    <img src="../images/graph_placeholder.jpg">
+                    <p>Graph 2</p>
+                </div>
+                <div class="graph">
+                    <img src="../images/graph_placeholder.jpg">
+                    <p>Graph 3</p>
+                </div>
+                <div class="graph-nav">
+                    <button onclick="prevGraph()">Previous</button>
+                    <button onclick="nextGraph()">Next</button>
+                </div>
+            </div>
+        </div>
+        <div class="right">
+            <h3>Probability Gauge Meter</h3>
+            <canvas id="probabilityGauge"></canvas>
+            <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Rerum possimus ut omnis impedit, doloribus molestias iusto veritatis consectetur, ducimus facilis dolor quae deleniti? Delectus amet, eveniet porro totam magni ipsum?</p>
+        </div>
+    </div>
+    <script src="../static/js/index.js"></script>
+</body>
+</html>

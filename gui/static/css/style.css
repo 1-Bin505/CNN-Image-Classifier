@@ -1,0 +1,77 @@
+body {
+    margin: 1%;
+    font-family: Arial, sans-serif;
+    height: 100vh;
+    text-align: center;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+}
+
+.left, .mid, .right{
+    padding: 20px;
+    border: 1px solid #000;
+}
+
+.left {
+    width: 25%;
+    text-align: center;
+}
+
+.mid {
+    width: 55%;
+    display: flex;
+    flex-direction: column;
+}
+
+.top-mid {
+    border-bottom: 1px solid #000;
+    text-align: left;
+}
+
+.bottom-mid {
+    text-align: left;
+}
+
+.graph {
+    display: none;
+    text-align: center;
+}
+
+.graph.active {
+    display: block;
+}
+
+.graph-nav {
+    text-align: center;
+}
+
+.right {
+    width: 20%;
+    text-align: center;
+}
+
+.left img {
+    width: 100%;
+    height: auto;
+}
+
+.graph img {
+    width: 100%;
+    height: 280px;
+}
+
+button {
+    margin: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#probabilityGauge {
+    width: 100%;
+    height: auto;
+    border: 1px solid #000;
+}
