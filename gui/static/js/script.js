@@ -1,277 +1,264 @@
-// --- Global Elements ---
-const fileInput = document.getElementById('file-input');
-const predictBtn = document.getElementById('predict-btn');
-const previewImage = document.getElementById('preview-image');
-const loadingOverlay = document.getElementById('loading');
-
-// Result display elements
-const predictionElement = document.getElementById('prediction');
-const accuracyElement = document.getElementById('accuracy');
-const precisionElement = document.getElementById('precision');
-const recallElement = document.getElementById('recall');
-const f1ScoreElement = document.getElementById('f1-score');
-
-// Chart and Gauge elements
-const resultsChartCanvas = document.getElementById('results-chart');
-const gaugeCanvas = document.getElementById('gauge-canvas');
-
-let currentFileName = null;
 let currentChart = null;
-let currentGauge = null;
+let currentGraphIndex = 0;
+const graphs = [
+    {
+        labels: ['Epoch 1', 'Epoch 2', 'Epoch 3', 'Epoch 4', 'Epoch 5', 'Epoch 6', 'Epoch 7', 'Epoch 8', 'Epoch 9', 'Epoch 10'],
+        values: [65, 72, 78, 82, 86, 88, 91, 93, 94, 95],
+        title: 'Training Accuracy'
+    },
+    {
+        labels: ['TP', 'TN', 'FP', 'FN'],
+        values: [450, 380, 35, 25],
+        title: 'Confusion Matrix'
+    },
+    {
+        labels: ['Precision', 'Recall', 'F1', 'Accuracy', 'Specificity'],
+        values: [92, 95, 94, 94, 91],
+        title: 'Metrics'
+    }
+];
 
+// File upload handling
+const fileInput = document.getElementById('file-input');
+const previewImage = document.getElementById('preview-image');
+const predictBtn = document.getElementById('predict-btn');
 
-
-//  FILE INPUT AND PREVIEW 
-
-fileInput.addEventListener('change', function() {
-    if (this.files && this.files[0]) {
-        const file = this.files[0];
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    console.log("File selected:", file);
+    
+    if (file) {
+        // Preview the image locally
         const reader = new FileReader();
-
-        reader.onload = function(e) {
+        reader.onload = (e) => {
             previewImage.src = e.target.result;
-            // Clear any previous results when a new image is loaded
-            resetResultsDisplay();
+            console.log("Image preview loaded");
         };
-        
         reader.readAsDataURL(file);
+
+        // Upload to server
+        const formData = new FormData();
+        formData.append('image', file);
         
-        // Enable the prediction button once a file is selected
-        predictBtn.disabled = false;
+        console.log("Uploading file to server...");
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            console.log("Response status:", response.status);
+            const data = await response.json();
+            console.log("Response data:", data);
+            
+            if (data.success) {
+                predictBtn.disabled = false;
+                predictBtn.dataset.filename = data.filename;
+                console.log("Upload successful, filename:", data.filename);
+            } else {
+                alert('Error uploading image: ' + data.error);
+                console.error("Upload failed:", data.error);
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Error uploading image: ' + error.message);
+        }
     }
 });
 
-
-//  PREDICTION BUTTON 
-
+// Prediction handling
 predictBtn.addEventListener('click', async () => {
-    if (!fileInput.files[0]) {
-        alert("Please select an image file first.");
+    const filename = predictBtn.dataset.filename;
+    
+    if (!filename) {
+        alert('Please upload an image first');
         return;
     }
 
-    // Disable button and  loading screen
+    document.getElementById('loading').classList.add('active');
     predictBtn.disabled = true;
-    showLoading(true);
 
     try {
-        // --- Step A: Upload the file to the server ---
-        const uploadedFilename = await uploadFile(fileInput.files[0]);
+        const response = await fetch('/predict', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                filename: filename,
+                model: 'resnet50'  // Default to resnet50
+            })
+        });
+
+        const data = await response.json();
         
-        if (uploadedFilename) {
-            currentFileName = uploadedFilename;
-
-            // --- Step B: Request prediction using the uploaded filename ---
-            const predictionResults = await getPrediction(currentFileName);
-            
-            // --- Step C: Update the UI with results ---
-            updateResultsUI(predictionResults);
+        if (data.error) {
+            alert(data.error);
+            return;
         }
+        
+        // Show single result
+        document.getElementById('single-result').style.display = 'block';
+        document.getElementById('all-results').style.display = 'none';
+        
+        // Update metrics
+        document.getElementById('model-name').textContent = data.model_name;
+        document.getElementById('prediction').textContent = data.prediction;
+        document.getElementById('accuracy').textContent = data.accuracy;
+        document.getElementById('precision').textContent = data.precision;
+        document.getElementById('recall').textContent = data.recall;
+        document.getElementById('f1-score').textContent = data.f1_score;
 
+        // Update gauge
+        updateGauge(data.probability);
+        
+        // Update chart to first graph
+        currentGraphIndex = 0;
+        updateChart(currentGraphIndex);
+        
     } catch (error) {
-        console.error("Prediction process failed:", error);
-        alert(`Error during prediction: ${error.message}`);
+        console.error('Prediction error:', error);
+        alert('Error making prediction');
     } finally {
-        // Re-enable button and hide loading screen
+        document.getElementById('loading').classList.remove('active');
         predictBtn.disabled = false;
-        showLoading(false);
     }
 });
 
-
-
-// 3. API CALL FUNCTIONS
-
-
-/** Sends the file to the /upload route and returns the server-saved filename. */
-async function uploadFile(file) {
-    const formData = new FormData();
-    formData.append('image', file);
-
-    const response = await fetch('/upload', {
-        method: 'POST',
-        body: formData
-    });
-
-    const data = await response.json();
-    if (response.ok && data.success) {
-        return data.filename;
-    } else {
-        throw new Error(data.error || 'Failed to upload image.');
-    }
-}
-
-/** Sends the filename to the /predict route and returns the prediction data. */
-async function getPrediction(filename) {
-    const response = await fetch('/predict', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ filename: filename })
-    });
-
-    const data = await response.json();
-    if (response.ok && !data.error) {
-        return data;
-    } else {
-        throw new Error(data.error || 'Prediction failed on the server.');
-    }
-}
-
-
-
-// 4. UI UPDATE FUNCTIONS
-
-
-function showLoading(show) {
-    loadingOverlay.style.display = show ? 'flex' : 'none';
-}
-
-function resetResultsDisplay() {
-    predictionElement.textContent = '...';
-    predictionElement.className = 'metric-value'; // Reset color class
-    accuracyElement.textContent = '';
-    precisionElement.textContent = '';
-    recallElement.textContent = '';
-    f1ScoreElement.textContent = '';
+// Chart handling
+function updateChart(index) {
+    const ctx = document.getElementById('results-chart');
+    const graphData = graphs[index];
     
-    if (currentChart) currentChart.destroy();
-    if (currentGauge) currentGauge.destroy();
-}
+    if (currentChart) {
+        currentChart.destroy();
+    }
 
-
-/** Updates all metric display elements and initializes charts. */
-function updateResultsUI(results) {
-    // A. Update Metrics
-    predictionElement.textContent = results.prediction;
-    accuracyElement.textContent = results.accuracy;
-    precisionElement.textContent = results.precision;
-    recallElement.textContent = results.recall;
-    f1ScoreElement.textContent = results.f1_score;
-
-    // Set color based on prediction (using classes defined in style.css)
-    const isPositive = results.prediction.toLowerCase().includes('positive');
-    predictionElement.classList.add(isPositive ? 'positive' : 'negative');
-    
-    // B. Update Charts
-    initResultsChart(results.graph_data.labels, results.graph_data.values);
-    initGauge(results.probability);
-}
-
-
-// 5. CHART.JS INITIALIZATION
-
-
-/** Initializes the bar chart showing class probabilities. */
-function initResultsChart(labels, values) {
-    if (currentChart) currentChart.destroy();
-
-    const chartData = {
-        labels: labels,
-        datasets: [{
-            label: 'Confidence Score',
-            data: values,
-            backgroundColor: values.map((v) => v === Math.max(...values) ? 'rgba(0, 123, 255, 0.8)' : 'rgba(108, 117, 125, 0.6)'),
-            borderColor: values.map((v) => v === Math.max(...values) ? '#007bff' : '#6c757d'),
-            borderWidth: 1
-        }]
-    };
-
-    currentChart = new Chart(resultsChartCanvas, {
+    currentChart = new Chart(ctx, {
         type: 'bar',
-        data: chartData,
+        data: {
+            labels: graphData.labels,
+            datasets: [{
+                label: graphData.title,
+                data: graphData.values,
+                backgroundColor: '#a8a8a8',
+                borderColor: '#888',
+                borderWidth: 1
+            }]
+        },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: 1.0,
-                    title: { display: true, text: 'Probability' }
+                    max: 100,
+                    ticks: {
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 11
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
                 }
             }
         }
     });
-}
-
-/** Initializes a simple gauge chart (Doughnut Chart variation). */
-function initGauge(probability) {
-    if (currentGauge) currentGauge.destroy();
-
-    const value = probability;
-    const data = {
-        datasets: [{
-            data: [value, 1 - value],
-            backgroundColor: [
-                value > 0.7 ? '#dc3545' : (value > 0.4 ? '#ffc107' : '#28a745'),
-                '#343a40' // Background color for the remaining arc
-            ],
-            borderWidth: 0
-        }]
-    };
-
-    currentGauge = new Chart(gaugeCanvas, {
-        type: 'doughnut',
-        data: data,
-        options: {
-            rotation: 270, // Start from the bottom left
-            circumference: 180, // Half circle
-            responsive: true,
-            maintainAspectRatio: true,
-            cutout: '80%',
-            plugins: {
-                tooltip: { enabled: false },
-                legend: { display: false },
-                // Custom plugin to display the value in the center
-                datalabels: {
-                    formatter: (value, context) => {
-                        // Only show label for the probability segment
-                        if (context.dataIndex === 0) {
-                            return `${(probability * 100).toFixed(1)}%`;
-                        }
-                        return '';
-                    },
-                    color: '#e0e0e0',
-                    font: { size: 24, weight: 'bold' },
-                    anchor: 'center',
-                    align: 'center'
-                }
-            }
-        },
-        plugins: [{
-            id: 'textCenter',
-            beforeDraw: function(chart) {
-                const width = chart.width,
-                      height = chart.height,
-                      ctx = chart.ctx;
-                
-                ctx.restore();
-                const fontSize = (height / 150).toFixed(2);
-                ctx.font = fontSize + "em sans-serif";
-                ctx.textBaseline = "middle";
-                
-                const text = `${(probability * 100).toFixed(1)}%`;
-                const textX = Math.round((width - ctx.measureText(text).width) / 2);
-                // Adjust position for gauges
-                const textY = (height / 2) + 30; 
-                
-                ctx.fillStyle = '#e0e0e0';
-                ctx.fillText(text, textX, textY);
-                ctx.save();
-            }
-        }]
-    });
-}
-
-
-// 6. INITIAL SETUP
-
-
-
-document.addEventListener('DOMContentLoaded', () => {
-
-    predictBtn.disabled = true;
-
     
+    document.querySelector('.graph-label').textContent = `Graph ${index + 1}`;
+}
+
+// Gauge meter
+function updateGauge(probability) {
+    const canvas = document.getElementById('gauge-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = 320;
+    canvas.height = 220;
+    
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height - 40;
+    const radius = 110;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw background arc
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI);
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 28;
+    ctx.stroke();
+    
+    // Draw filled arc
+    const endAngle = Math.PI + (Math.PI * probability);
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, Math.PI, endAngle);
+    
+    let color;
+    if (probability < 0.4) {
+        color = '#4CAF50';
+    } else if (probability < 0.7) {
+        color = '#FFC107';
+    } else {
+        color = '#F44336';
+    }
+    
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 28;
+    ctx.stroke();
+    
+    // Draw percentage
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(Math.round(probability * 100) + '%', centerX, centerY - 15);
+    
+    // Draw needle
+    const needleAngle = Math.PI + (Math.PI * probability);
+    const needleLength = radius - 20;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(
+        centerX + needleLength * Math.cos(needleAngle),
+        centerY + needleLength * Math.sin(needleAngle)
+    );
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Center circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 12, 0, 2 * Math.PI);
+    ctx.fillStyle = '#000';
+    ctx.fill();
+}
+
+// Graph navigation
+document.getElementById('prev-graph').addEventListener('click', () => {
+    if (currentChart) {
+        currentGraphIndex = (currentGraphIndex - 1 + graphs.length) % graphs.length;
+        updateChart(currentGraphIndex);
+    }
 });
+
+document.getElementById('next-graph').addEventListener('click', () => {
+    if (currentChart) {
+        currentGraphIndex = (currentGraphIndex + 1) % graphs.length;
+        updateChart(currentGraphIndex);
+    }
+});
+
+// Initialize gauge with 0
+updateGauge(0);
